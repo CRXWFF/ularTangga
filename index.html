@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Permainan Ular Tangga</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>🎲 Ular Tangga Seru! 🐍</h1>
+      <div id="game-info">
+        <p>Pemain saat ini: <span id="current-player">Pemain 1</span></p>
+        <p>Hasil Dadu: <span id="dice-result">-</span></p>
+        <button id="roll-dice">Lempar Dadu 🎲</button>
+      </div>
+      <div id="board"></div>
+      <div id="message"></div>
+    </div>
+    <div id="question-popup" class="popup hidden">
+      <div class="popup-content">
+        <h2>Pertanyaan!</h2>
+        <p id="question-text"></p>
+        <div id="question-options"></div>
+        <div id="question-feedback"></div>
+      </div>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>
