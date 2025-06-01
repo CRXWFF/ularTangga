@@ -6,74 +6,81 @@ const players = [
 ];
 let currentPlayerIndex = 0;
 let isMoving = false;
+let ladders = {};
+let snakes = {};
+let questionCells = [];
+let questions = [];
 
-// Daftar tangga, ular, dan kotak pertanyaan
-const ladders = { 4: 14, 9: 31, 20: 38, 28: 84, 40: 59, 63: 81, 71: 91 };
-const snakes = { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 79 };
-const questionCells = [10, 25, 50, 75];
+function generateBoardElements(numQuestionCells) {
+    ladders = {};
+    snakes = {};
+    questionCells = [];
 
-// Daftar pertanyaan
-const questions = [
-    {
-        text: "2 + 3 = ?",
-        options: ["4", "5", "6", "7"],
-        answer: "5"
-    },
-    {
-        text: "Ibukota Indonesia adalah?",
-        options: ["Jakarta", "Bandung", "Surabaya", "Medan"],
-        answer: "Jakarta"
-    },
-    {
-        text: "Hewan yang bernapas dengan insang?",
-        options: ["Katak", "Ikan", "Kucing", "Burung"],
-        answer: "Ikan"
-    },
-    {
-        text: "Kata yang berlawanan dengan 'besar' adalah?",
-        options: ["Kecil", "Panjang", "Tinggi", "Lebar"],
-        answer: "Kecil"
-    },
-    {
-        text: "5 × 4 = ?",
-        options: ["15", "20", "25", "30"],
-        answer: "20"
-    },
-    {
-        text: "Gunung tertinggi di Indonesia?",
-        options: ["Rinjani", "Semeru", "Kerinci", "Jaya Wijaya"],
-        answer: "Jaya Wijaya"
-    },
-    {
-        text: "Tumbuhan menghasilkan oksigen melalui?",
-        options: ["Fotosintesis", "Respirasi", "Transpirasi", "Evaporasi"],
-        answer: "Fotosintesis"
-    },
-    {
-        text: "10 - 7 = ?",
-        options: ["2", "3", "4", "5"],
-        answer: "3"
-    },
-    {
-        text: "Nama planet tempat kita tinggal?",
-        options: ["Mars", "Bumi", "Jupiter", "Venus"],
-        answer: "Bumi"
-    },
-    {
-        text: "Bahasa resmi negara Indonesia adalah?",
-        options: ["Jawa", "Sunda", "Indonesia", "Inggris"],
-        answer: "Indonesia"
+    // Daftar kotak yang tersedia (2-100, kecuali kotak 1)
+    let availableCells = Array.from({ length: boardSize - 1 }, (_, i) => i + 2);
+    const usedCells = new Set();
+
+    // Generate 7 tangga
+    for (let i = 0; i < 7; i++) {
+        if (availableCells.length < 2) break;
+        const startIndex = Math.floor(Math.random() * availableCells.length);
+        const start = availableCells[startIndex];
+        availableCells.splice(startIndex, 1);
+        usedCells.add(start);
+
+        const possibleDestinations = availableCells.filter(cell => cell > start);
+        if (possibleDestinations.length === 0) continue;
+        const endIndex = Math.floor(Math.random() * possibleDestinations.length);
+        const end = possibleDestinations[endIndex];
+        availableCells = availableCells.filter(cell => cell !== end);
+        usedCells.add(end);
+
+        ladders[start] = end;
     }
-];
 
-function createBoard() {
+    // Generate 10 ular
+    for (let i = 0; i < 10; i++) {
+        if (availableCells.length < 2) break;
+        const startIndex = Math.floor(Math.random() * availableCells.length);
+        const start = availableCells[startIndex];
+        availableCells.splice(startIndex, 1);
+        usedCells.add(start);
+
+        const possibleDestinations = availableCells.filter(cell => cell < start && cell >= 2);
+        if (possibleDestinations.length === 0) continue;
+        const endIndex = Math.floor(Math.random() * possibleDestinations.length);
+        const end = possibleDestinations[endIndex];
+        availableCells = availableCells.filter(cell => cell !== end);
+        usedCells.add(end);
+
+        snakes[start] = end;
+    }
+
+    // Generate kotak pertanyaan sesuai input pengguna
+    const maxQuestions = Math.min(numQuestionCells, availableCells.length);
+    for (let i = 0; i < maxQuestions; i++) {
+        if (availableCells.length === 0) break;
+        const randomIndex = Math.floor(Math.random() * availableCells.length);
+        questionCells.push(availableCells[randomIndex]);
+        usedCells.add(availableCells[randomIndex]);
+        availableCells.splice(randomIndex, 1);
+    }
+
+    console.log(`Tangga: ${JSON.stringify(ladders)}`);
+    console.log(`Ular: ${JSON.stringify(snakes)}`);
+    console.log(`Kotak pertanyaan: ${questionCells}`);
+}
+
+function createBoard(numQuestionCells) {
+    generateBoardElements(numQuestionCells);
     const board = document.getElementById('board');
+    board.innerHTML = ''; // Bersihkan papan
     for (let i = boardSize; i >= 1; i--) {
         const cell = document.createElement('div');
         cell.classList.add('cell');
         cell.id = `cell-${i}`;
         if (ladders[i]) cell.classList.add('ladder');
-        if (Object.values(snakes).includes(i)) cell.classList.add('snake');
+        if (snakes[i]) cell.classList.add('snake'); // Tandai kotak asal ular
         if (questionCells.includes(i)) cell.classList.add('question');
         cell.textContent = i;
         board.appendChild(cell);
@@ -82,173 +89,290 @@ function createBoard() {
 }
 
 function rollDice() {
-    const result = Math.floor(Math.random() * 6) + 1; // Hanya 1-6
+    const result = Math.floor(Math.random() * 6) + 1;
     console.log(`Hasil dadu: ${result}`);
     return result;
 }
 
 function showQuestion(player) {
-    const popup = document.getElementById('question-popup');
-    const questionText = document.getElementById('question-text');
-    const questionOptions = document.getElementById('question-options');
-    const questionFeedback = document.getElementById('question-feedback');
+    try {
+        const popup = document.getElementById('question-popup');
+        const questionText = document.getElementById('question-text');
+        const questionOptions = document.getElementById('question-options');
+        const questionFeedback = document.getElementById('question-feedback');
 
-    const question = questions[Math.floor(Math.random() * questions.length)];
-    questionText.textContent = question.text;
-    questionOptions.innerHTML = '';
-    questionFeedback.textContent = '';
+        const question = questions[Math.floor(Math.random() * questions.length)];
+        questionText.textContent = question.text;
+        questionOptions.innerHTML = '';
+        questionFeedback.textContent = '';
 
-    question.options.forEach(option => {
-        const button = document.createElement('button');
-        button.textContent = option;
-        button.addEventListener('click', () => {
-            if (option === question.answer) {
-                questionFeedback.textContent = 'Benar! Lanjutkan giliran berikutnya.';
-                questionFeedback.style.color = '#008000';
-            } else {
-                questionFeedback.textContent = 'Salah! Kamu kehilangan giliran.';
-                questionFeedback.style.color = '#ff0000';
-                player.skipTurn = true;
-            }
-            setTimeout(() => {
-                popup.classList.add('hidden');
-                isMoving = false; // Pastikan isMoving diatur ulang
-                currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
-                startTurn();
-            }, 1000);
+        question.options.forEach(option => {
+            const button = document.createElement('button');
+            button.textContent = option;
+            button.addEventListener('click', () => {
+                if (option === question.answer) {
+                    questionFeedback.textContent = 'Benar! Lanjutkan giliran berikutnya.';
+                    questionFeedback.style.color = '#008000';
+                } else {
+                    questionFeedback.textContent = 'Salah! Kamu kehilangan giliran.';
+                    questionFeedback.style.color = '#ff0000';
+                    player.skipTurn = true;
+                }
+                setTimeout(() => {
+                    popup.classList.add('hidden');
+                    isMoving = false;
+                    console.log('Pop-up pertanyaan ditutup, isMoving diatur ke false');
+                    currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+                    startTurn();
+                }, 1000);
+            });
+            questionOptions.appendChild(button);
         });
-        questionOptions.appendChild(button);
-    });
 
-    popup.classList.remove('hidden');
+        popup.classList.remove('hidden');
+    } catch (error) {
+        console.error('Error di showQuestion:', error);
+        isMoving = false;
+        startTurn();
+    }
 }
 
 async function animatePlayer(player, startPos, endPos) {
-    isMoving = true;
-    const playerElement = document.querySelector(`.player[data-player-id="${player.id}"]`);
-    const steps = Math.min(endPos - startPos, boardSize - startPos); // Batasi langkah
-    const path = [];
+    try {
+        console.log(`Memulai animasi pemain ${player.id} dari ${startPos} ke ${endPos}`);
+        isMoving = true;
 
-    // Buat jalur hanya untuk jumlah langkah yang sesuai
-    for (let i = 1; i <= steps && startPos + i <= boardSize; i++) {
-        path.push(startPos + i);
-    }
-    console.log(`Pemain ${player.id} bergerak dari ${startPos} ke ${endPos}, langkah: ${steps}, jalur: ${path}`);
-
-    // Animasi per kotak
-    for (const pos of path) {
-        player.position = pos;
-        const cell = document.getElementById(`cell-${pos}`);
-        if (cell) {
-            cell.appendChild(playerElement);
-            await new Promise(resolve => setTimeout(resolve, 300)); // Durasi per kotak: 300ms
-        } else {
-            console.error(`Kotak cell-${pos} tidak ditemukan!`);
+        // Validasi posisi
+        if (endPos < 1 || endPos > boardSize) {
+            console.error(`Posisi tujuan ${endPos} tidak valid!`);
             isMoving = false;
             return;
         }
-    }
 
-    // Cek tangga atau ular setelah animasi
-    if (ladders[player.position]) {
-        const newPos = ladders[player.position];
-        document.getElementById('message').textContent = `Yay! Pemain ${player.id} naik tangga ke ${newPos}!`;
-        await new Promise(resolve => setTimeout(resolve, 500)); // Jeda sebelum animasi tangga
-        await animatePlayer(player, player.position, newPos);
-    } else if (snakes[player.position]) {
-        const newPos = snakes[player.position];
-        document.getElementById('message').textContent = `Oh tidak! Pemain ${player.id} digigit ular, turun ke ${newPos}!`;
-        await new Promise(resolve => setTimeout(resolve, 500)); // Jeda sebelum animasi ular
-        await animatePlayer(player, player.position, newPos);
-    }
+        // Tentukan jalur animasi
+        const path = [];
+        if (endPos >= startPos) {
+            // Pergerakan maju
+            for (let i = startPos + 1; i <= endPos; i++) {
+                path.push(i);
+            }
+        } else {
+            // Pergerakan mundur (ular)
+            for (let i = startPos - 1; i >= endPos; i--) {
+                path.push(i);
+            }
+        }
+        console.log(`Jalur animasi pemain ${player.id}: ${path}`);
 
-    isMoving = false; // Pastikan isMoving diatur ulang setelah animasi
+        // Animasi per kotak
+        for (const pos of path) {
+            const cell = document.getElementById(`cell-${pos}`);
+            if (!cell) {
+                console.error(`Kotak cell-${pos} tidak ditemukan!`);
+                isMoving = false;
+                return;
+            }
+            player.position = pos;
+            updatePlayerPositions();
+            console.log(`Pemain ${player.id} bergerak ke posisi ${pos}`);
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+
+        // Pastikan posisi akhir
+        player.position = endPos;
+        updatePlayerPositions();
+
+        // Cek tangga atau ular
+        if (ladders[player.position]) {
+            const newPos = ladders[player.position];
+            document.getElementById('message').textContent = `Yay! Pemain ${player.id} naik tangga ke ${newPos}!`;
+            console.log(`Pemain ${player.id} naik tangga ke ${newPos}`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await animatePlayer(player, player.position, newPos);
+        } else if (snakes[player.position]) {
+            const newPos = snakes[player.position];
+            document.getElementById('message').textContent = `Oh tidak! Pemain ${player.id} digigit ular, turun ke ${newPos}!`;
+            console.log(`Pemain ${player.id} digigit ular, turun ke ${newPos}`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await animatePlayer(player, player.position, newPos);
+        }
+
+        isMoving = false;
+        console.log(`Animasi selesai untuk pemain ${player.id}, isMoving diatur ke false`);
+    } catch (error) {
+        console.error('Error di animatePlayer:', error);
+        isMoving = false;
+        updatePlayerPositions();
+        startTurn();
+    }
 }
 
 async function movePlayer(player, steps) {
-    if (player.skipTurn) {
-        document.getElementById('message').textContent = `Pemain ${player.id} kehilangan giliran!`;
-        player.skipTurn = false;
+    try {
+        if (player.skipTurn) {
+            document.getElementById('message').textContent = `Pemain ${player.id} kehilangan giliran!`;
+            player.skipTurn = false;
+            currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            isMoving = false;
+            console.log('Pemain kehilangan giliran, isMoving diatur ke false');
+            startTurn();
+            return;
+        }
+
+        const startPos = player.position;
+        let newPosition = Math.min(player.position + steps, boardSize);
+        console.log(`Pemain ${player.id} mulai dari ${startPos}, tujuan ${newPosition}, langkah: ${steps}`);
+
+        if (newPosition === startPos) {
+            document.getElementById('message').textContent = `Pemain ${player.id} melewati batas!`;
+            currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            isMoving = false;
+            console.log('Melewati batas, isMoving diatur ke false');
+            startTurn();
+            return;
+        }
+
+        await animatePlayer(player, startPos, newPosition);
+
+        if (questionCells.includes(player.position)) {
+            document.getElementById('message').textContent = `Pemain ${player.id} dapat pertanyaan!`;
+            console.log(`Pemain ${player.id} mendarat di kotak pertanyaan ${player.position}`);
+            showQuestion(player);
+            return;
+        }
+
+        if (player.position === boardSize) {
+            document.getElementById('message').textContent = `Selamat! Pemain ${player.id} menang! 🎉`;
+            document.getElementById('roll-dice').disabled = true;
+            isMoving = false;
+            console.log('Pemain menang, isMoving diatur ke false');
+            return;
+        }
+
         currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
-        isMoving = false; // Pastikan isMoving diatur ulang
         startTurn();
-        return;
-    }
-
-    const startPos = player.position;
-    let newPosition = Math.min(player.position + steps, boardSize); // Batasi hingga boardSize
-    console.log(`Pemain ${player.id} mulai dari ${startPos}, tujuan ${newPosition}, langkah ${steps}`);
-
-    if (newPosition === startPos) {
-        document.getElementById('message').textContent = `Pemain ${player.id} melewati batas!`;
-        currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
-        isMoving = false; // Pastikan isMoving diatur ulang
+    } catch (error) {
+        console.error('Error di movePlayer:', error);
+        isMoving = false;
         startTurn();
-        return;
     }
-
-    await animatePlayer(player, startPos, newPosition);
-
-    // Cek pertanyaan setelah animasi
-    if (questionCells.includes(player.position)) {
-        document.getElementById('message').textContent = `Pemain ${player.id} dapat pertanyaan!`;
-        showQuestion(player);
-        return;
-    }
-
-    // Cek pemenang
-    if (player.position === boardSize) {
-        document.getElementById('message').textContent = `Selamat! Pemain ${player.id} menang! 🎉`;
-        document.getElementById('roll-dice').disabled = true;
-        isMoving = false; // Pastikan isMoving diatur ulang
-        return;
-    }
-
-    currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
-    startTurn();
 }
 
 function updatePlayerPositions() {
-    document.querySelectorAll('.player').forEach(el => el.remove());
-    players.forEach(player => {
-        const cell = document.getElementById(`cell-${player.position}`);
-        if (cell) {
-            const playerElement = document.createElement('span');
-            playerElement.classList.add('player');
-            playerElement.setAttribute('data-player-id', player.id);
-            playerElement.textContent = player.emoji;
-            cell.appendChild(playerElement);
-        } else {
-            console.error(`Kotak cell-${player.position} tidak ditemukan untuk pemain ${player.id}`);
-        }
-    });
+    try {
+        document.querySelectorAll('.player').forEach(el => el.remove());
+        players.forEach(player => {
+            const cell = document.getElementById(`cell-${player.position}`);
+            if (cell) {
+                const playerElement = document.createElement('span');
+                playerElement.classList.add('player');
+                playerElement.setAttribute('data-player-id', player.id);
+                playerElement.textContent = player.emoji;
+                cell.appendChild(playerElement);
+            } else {
+                console.error(`Kotak cell-${player.position} tidak ditemukan untuk pemain ${player.id}`);
+            }
+        });
+    } catch (error) {
+        console.error('Error di updatePlayerPositions:', error);
+    }
 }
 
 function startTurn() {
-    if (isMoving) {
-        console.log('Masih bergerak, menunggu animasi selesai');
-        return;
+    try {
+        if (isMoving) {
+            console.log('Masih bergerak, menunggu animasi selesai');
+            return;
+        }
+        const currentPlayer = players[currentPlayerIndex];
+        document.getElementById('current-player').textContent = `Pemain ${currentPlayer.id} ${currentPlayer.emoji}`;
+        document.getElementById('dice-result').textContent = '-';
+        if (!document.getElementById('message').textContent.includes('Pertanyaan')) {
+            document.getElementById('message').textContent = '';
+        }
+        document.getElementById('roll-dice').disabled = false;
+        console.log(`Giliran pemain ${currentPlayer.id}, tombol dadu diaktifkan`);
+    } catch (error) {
+        console.error('Error di startTurn:', error);
     }
-    const currentPlayer = players[currentPlayerIndex];
-    document.getElementById('current-player').textContent = `Pemain ${currentPlayer.id} ${currentPlayer.emoji}`;
-    document.getElementById('dice-result').textContent = '-';
-    if (!document.getElementById('message').textContent.includes('Pertanyaan')) {
-        document.getElementById('message').textContent = '';
-    }
-    document.getElementById('roll-dice').disabled = false; // Pastikan tombol aktif
 }
 
-document.getElementById('roll-dice').addEventListener('click', () => {
-    if (isMoving) {
-        console.log('Tombol dadu diklik tetapi masih bergerak');
-        return;
+// Setup formulir pertanyaan
+document.getElementById('add-question').addEventListener('click', () => {
+    try {
+        const questionInputs = document.getElementById('question-inputs');
+        const newInput = document.createElement('div');
+        newInput.classList.add('question-input');
+        newInput.innerHTML = `
+            <label>Pertanyaan:</label>
+            <input type="text" class="question-text" placeholder="Masukkan pertanyaan" required>
+            <label>Opsi (pisahkan dengan koma):</label>
+            <input type="text" class="question-options" placeholder="Opsi 1,Opsi 2,Opsi 3,Opsi 4" required>
+            <label>Jawaban Benar:</label>
+            <input type="text" class="question-answer" placeholder="Jawaban benar" required>
+        `;
+        questionInputs.appendChild(newInput);
+    } catch (error) {
+        console.error('Error di add-question:', error);
     }
-    const currentPlayer = players[currentPlayerIndex];
-    const diceResult = rollDice();
-    document.getElementById('dice-result').textContent = diceResult;
-    movePlayer(currentPlayer, diceResult);
 });
 
-// Inisialisasi permainan
-createBoard();
-startTurn();
+document.getElementById('start-game').addEventListener('click', () => {
+    try {
+        const questionInputs = document.querySelectorAll('.question-input');
+        const questionCount = parseInt(document.getElementById('question-count').value);
+        const errorDiv = document.getElementById('setup-error');
+        questions = [];
+
+        // Validasi input
+        if (questionCount < 1 || questionCount > 10 || isNaN(questionCount)) {
+            errorDiv.textContent = 'Jumlah kotak pertanyaan harus antara 1 dan 10!';
+            return;
+        }
+
+        let valid = true;
+        questionInputs.forEach(input => {
+            const text = input.querySelector('.question-text').value.trim();
+            const options = input.querySelector('.question-options').value.split(',').map(opt => opt.trim());
+            const answer = input.querySelector('.question-answer').value.trim();
+
+            if (!text || options.length < 2 || !answer || !options.includes(answer)) {
+                valid = false;
+            } else {
+                questions.push({ text, options, answer });
+            }
+        });
+
+        if (!valid || questions.length === 0) {
+            errorDiv.textContent = 'Masukkan setidaknya satu pertanyaan valid dengan opsi dan jawaban benar!';
+            return;
+        }
+
+        // Sembunyikan setup dan tampilkan permainan
+        document.getElementById('setup-screen').classList.add('hidden');
+        document.getElementById('game-screen').classList.remove('hidden');
+
+        // Mulai permainan
+        createBoard(questionCount);
+        startTurn();
+    } catch (error) {
+        console.error('Error di start-game:', error);
+    }
+});
+
+document.getElementById('roll-dice').addEventListener('click', () => {
+    try {
+        if (isMoving) {
+            console.log('Tombol dadu diklik tetapi masih bergerak');
+            return;
+        }
+        const currentPlayer = players[currentPlayerIndex];
+        const diceResult = rollDice();
+        document.getElementById('dice-result').textContent = diceResult;
+        movePlayer(currentPlayer, diceResult);
+    } catch (error) {
+        console.error('Error di roll-dice:', error);
+        isMoving = false;
+        startTurn();
+    }
+});
